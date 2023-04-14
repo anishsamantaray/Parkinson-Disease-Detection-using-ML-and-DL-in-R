@@ -31,9 +31,6 @@ install.packages("stringr")
 install.packages("caret")
 install.packages("neuralnet")
 install.packages("moments")
-install.packages("neuralnet")
-install.packages("neuralnet")
-
 
 ```
 
