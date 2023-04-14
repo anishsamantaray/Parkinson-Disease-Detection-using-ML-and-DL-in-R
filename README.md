@@ -13,7 +13,7 @@ Our findings suggest that utilising PCA on the pre-processed data and the ANN al
 
 Link: https://archive.ics.uci.edu/ml/datasets/parkinsons
 
-## Packages used
+## Required Packages
 
 ```bash
 install.packages("ggplot2")
