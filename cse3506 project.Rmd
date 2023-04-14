@@ -1,0 +1,864 @@
+---
+title: "cse3506 project"
+author: "Team K"
+date: "2023-03-08"
+output:
+  html_document:
+    df_print: paged
+---
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# Code for inline plotting
+options(repr.plot.width=7, repr.plot.height=10)
+
+# Your code goes here
+
+```
+
+
+```{r}
+df <- read.csv("C:/Users/lenovo/Downloads/Park.csv")
+head(df,2)
+```
+```{r}
+str(df)
+```
+
+```{r}
+summary(df)
+```
+
+
+
+```{r}
+
+dfstatus <- factor(df$status, levels = c(0, 1))
+```
+
+```{r}
+library(ggplot2)
+# Create a bar plot
+ggplot(data = df, aes(x = factor(status))) +
+ geom_bar(stat = "count") +
+  labs(title = "Distribution of Parkinson's Disease Status", x = "Status", y = "Count")
+
+```
+
+```{r}
+colSums(is.na(df))
+
+```
+```{r}
+boxplot(df)
+```
+
+```{r}
+cor_matrix <- cor(df)                      # Correlation matrix
+cor_matrix
+```
+```{r}
+cor_matrix_rm <- cor_matrix                  # Modify correlation matrix
+cor_matrix_rm[upper.tri(cor_matrix_rm)] <- 0
+diag(cor_matrix_rm) <- 0
+cor_matrix_rm
+```
+```{r}
+library(reshape2)
+# creating correlation matrix
+corr_mat <- round(cor(df),2)
+ 
+# reduce the size of correlation matrix
+melted_corr_mat <- melt(corr_mat)
+# head(melted_corr_mat)
+ 
+# plotting the correlation heatmap
+library(ggplot2)
+ggplot(data = melted_corr_mat,size=30, aes(x=Var1, y=Var2,
+                                   fill=value)) +
+geom_tile()
+```
+
+```{r}
+df <- df[ , !apply(cor_matrix_rm,    # Remove highly correlated variables
+                           2,
+                           function(x) any(x > 0.8 & x<  -0.8))]
+head(df)  
+```
+
+
+
+
+```{r}
+library(dplyr)
+
+X <- select(df, 1:22)
+
+```
+
+```{r}
+X
+```
+
+```{r}
+y <- df$status
+y
+```
+```{r}
+# Loading package
+library(caTools)
+library(ROCR) 
+```
+
+```{r}
+# Splitting dataset
+
+set.seed(123)
+split <- sample.split(df, SplitRatio = 0.7)
+train_reg <- subset(df, split == "TRUE")
+test_reg <- subset(df, split == "FALSE")
+```
+
+
+
+Logistic Regression
+```{r}
+# Training model
+logistic_model <- glm(train_reg$status ~., 
+                      data = train_reg, 
+                      family = "binomial")
+logistic_model
+
+```
+
+```{r}
+   
+# Summary
+summary(logistic_model)
+```
+
+```{r}
+# Predict test data based on model
+predict_reg <- predict(logistic_model, 
+                       test_reg, type = "response")
+predict_reg
+```
+
+
+```{r}
+# Changing probabilities
+predict_reg <- ifelse(predict_reg >0.5, 1, 0)
+   
+# Evaluating model accuracy
+# using confusion matrix
+table(test_reg$status, predict_reg)
+error <- mean(predict_reg != test_reg$status)
+print(paste('Accuracy',1-error))   
+```
+```{r}
+library("MLmetrics")
+Precision(predict_reg,test_reg$status)
+Recall(predict_reg,test_reg$statu)
+F1_Score(predict_reg,test_reg$status)
+
+```
+
+Random Forest
+```{r}
+library(randomForest)
+
+classifier_RF = randomForest(status ~ ., data = train_reg, ntree = 200)
+
+classifier_RF
+```
+```{r}
+test_reg
+```
+```{r}
+y_pred <- predict(classifier_RF, newdata = test_reg,type = "response")
+# Changing probabilities
+predict_reg1 <- ifelse(y_pred >0.5, 1, 0)
+   
+# Evaluating model accuracy
+# using confusion matrix
+table(test_reg$status, predict_reg1)
+error <- mean(predict_reg1 != test_reg$status)
+print(paste('Accuracy',1-error))   
+```
+
+```{r}
+Precision(predict_reg1,test_reg$status)
+Recall(predict_reg1,test_reg$statu)
+F1_Score(predict_reg1,test_reg$status)
+```
+
+
+lightGBM
+```{r}
+library(lightgbm) 
+```
+
+```{r}
+train_reg4 = as.matrix(train_reg)
+test_reg4 = as.matrix(test_reg)
+
+train_x = train_reg4[, -23]
+train_y = train_reg4[, 23]
+
+test_x = test_reg4[, -23]
+test_y = test_reg4[, 23]
+
+dtrain = lgb.Dataset(train_x, label = train_y)
+dtest = lgb.Dataset.create.valid(dtrain, data=test_x, label = test_y)
+```
+
+
+```{r}
+library(lightgbm) 
+params = list(
+  objective= 'binary'
+)
+
+valids = list(test = dtest)
+
+```
+```{r}
+model = lgb.train(params,
+                   dtrain,
+                   nrounds = 100,
+                   valids,
+                   min_data=1,
+                   learning_rate = 1,
+                   early_stopping_rounds = 10)
+```
+``
+```{r}
+pred2 = predict(model, test_x, reshape=T)
+predict_reg16 <- ifelse(pred2 >0.5, 1, 0)
+   
+# Evaluating model accuracy
+# using confusion matrix
+table(test_y, predict_reg16)
+error <- mean(predict_reg16 != test_y)
+print(paste('Accuracy',1-error)) 
+```
+```{r}
+Precision(predict_reg16,test_reg$status)
+Recall(predict_reg16,test_reg$statu)
+F1_Score(predict_reg16,test_reg$status)
+```
+```{r}
+# Fitting SVM to the Training set
+
+library(e1071)
+
+classifier = svm(formula =status ~.,
+				data = train_reg,
+				type = 'C-classification',
+				kernel = 'linear')
+
+
+```
+
+```{r}
+summary(classifier)
+```
+```{r}
+y_pred3 <- predict(classifier, newdata = test_reg,type = "response")
+# Changing probabilities
+
+   
+# Evaluating model accuracy
+# using confusion matrix
+table(test_reg$status, y_pred3)
+error <- mean(y_pred3 != test_reg$status)
+print(paste('Accuracy',1-error)) 
+```
+```{r}
+Precision(y_pred3,test_reg$status)
+Recall(y_pred3,test_reg$status)
+F1_Score(y_pred3,test_reg$status)
+```
+
+
+```{r}
+library(xgboost)
+library(readr)
+library(stringr)
+library(caret)
+```
+
+
+```{r}
+xgb <- xgboost(data.matrix(train_reg[,-23]), 
+ label = train_reg$status, 
+ eta = 0.1,
+ max_depth = 15, 
+ nround=25, 
+ subsample = 0.5,
+ colsample_bytree = 0.5,
+ seed = 1,
+
+)
+```
+```{r}
+y_pred5 <- predict(xgb, newdata = data.matrix(test_reg[,-23]),type = "response")
+# Changing probabilities
+predict_reg5 <- ifelse(y_pred5 >0.5, 1, 0)
+   
+# Evaluating model accuracy
+# using confusion matrix
+table(test_reg$status, predict_reg5)
+error <- mean(predict_reg5 != test_reg$status)
+print(paste('Accuracy',1-error))   
+```
+```{r}
+Precision(predict_reg5,test_reg$status)
+Recall(predict_reg5,test_reg$status)
+F1_Score(predict_reg5,test_reg$status)
+```
+```{r}
+library(neuralnet)
+n1 <- neuralnet(status~.,
+               data = train_reg,
+               hidden = 5,
+               err.fct = "ce",
+               linear.output = FALSE,
+               lifesign = 'full',
+               rep = 5,
+               algorithm = "rprop+",
+               stepmax = 100000)
+```
+
+```{r}
+output2 <- compute(n1, rep = 5, test_reg[, -23])
+p2 <- output2$net.result
+pred2 <- ifelse(p2 > 0.5, 1, 0)
+tab1 <- table(pred2, test_reg$status)
+tab1
+```
+```{r}
+accuracy=sum(diag(tab1)) / sum(tab1)
+accuracy
+```
+
+
+```{r}
+Precision(pred2,test_reg$status)
+Recall(pred2,test_reg$status)
+F1_Score(pred2,test_reg$status)
+```
+
+
+
+```{r}
+# Required for skewness() function
+library(moments)
+skewness(df)
+```
+```{r}
+head(df,2)
+```
+
+```{r}
+df1=df
+df1$MDVP.Fhi.Hz. <- log(df$MDVP.Fhi.Hz.)
+df1$MDVP.Jitter... <- log(df$MDVP.Jitter...)
+df1$JitterAbs <- log(df$JitterAbs)
+df1$RAP <- log(df$RAP)
+df1$PPQ  <- log(df$PPQ )
+df1$Jitter<- log(df$Jitter)
+df1$Shimmer<- log(df$Shimmer)
+df1$ShimmerdB<- log(df$ShimmerdB)
+df1$ShimmerAPQ5<- log(df$ShimmerAPQ5)
+```
+
+```{r}
+df1$APQ<- log(df$APQ)
+df1$NHR <- log(df$NHR )
+```
+
+```{r}
+skewness(df1)
+```
+
+```{r}
+library(caTools)
+library(ROCR) 
+set.seed(123)
+split <- sample.split(df1, SplitRatio = 0.7)
+train_reg1 <- subset(df1, split == "TRUE")
+test_reg1 <- subset(df1, split == "FALSE")
+```
+
+```{r}
+# Training model
+logistic_model1 <- glm(train_reg1$status ~., 
+                      data = train_reg1, 
+                      family = "binomial")
+logistic_model1
+
+```
+```{r}
+predict_reg6 <- predict(logistic_model1, 
+                       test_reg1, type = "response")
+# Changing probabilities
+predict_reg6 <- ifelse(predict_reg6 >0.5, 1, 0)
+   
+# Evaluating model accuracy
+# using confusion matrix
+table(test_reg1$status, predict_reg6)
+error <- mean(predict_reg6 != test_reg1$status)
+print(paste('Accuracy',1-error))  
+```
+```{r}
+Precision(predict_reg6,test_reg1$status)
+Recall(predict_reg6,test_reg1$status)
+F1_Score(predict_reg6,test_reg1$status)
+```
+
+
+```{r}
+library(xgboost)
+xgb1 <- xgboost(data.matrix(train_reg1[,-23]), 
+ label = train_reg1$status, 
+ eta = 0.1,
+ max_depth = 15, 
+ nround=25, 
+ subsample = 0.5,
+ colsample_bytree = 0.5,
+ seed = 1,
+
+)
+```
+
+```{r}
+y_pred7 <- predict(xgb1, newdata = data.matrix(test_reg1[,-23]),type = "response")
+# Changing probabilities
+predict_reg7 <- ifelse(y_pred7 >0.5, 1, 0)
+   
+# Evaluating model accuracy
+# using confusion matrix
+table(test_reg$status, predict_reg7)
+error <- mean(predict_reg7 != test_reg1$status)
+print(paste('Accuracy',1-error))   
+```
+```{r}
+Precision(predict_reg7,test_reg1$status)
+Recall(predict_reg7,test_reg1$status)
+F1_Score(predict_reg7,test_reg1$status)
+```
+
+
+
+```{r}
+
+library(e1071)
+
+classifier1 = svm(formula =status ~.,
+				data = train_reg1,
+				type = 'C-classification',
+				kernel = 'linear')
+
+```
+
+```{r}
+y_pred9 <- predict(classifier1, newdata = test_reg1,type = "response")
+# Changing probabilities
+
+   
+# Evaluating model accuracy
+# using confusion matrix
+table(test_reg1$status, y_pred9)
+error <- mean(y_pred9 != test_reg$status)
+print(paste('Accuracy',1-error)) 
+```
+```{r}
+Precision(y_pred9,test_reg1$status)
+Recall(y_pred9,test_reg1$status)
+F1_Score(y_pred9,test_reg1$status)
+```
+
+
+```{r}
+library(randomForest)
+
+classifier_RF1 = randomForest(status ~ ., data = train_reg1, ntree = 200)
+
+classifier_RF1
+```
+```{r}
+y_pred10 <- predict(classifier_RF1, newdata = test_reg1,type = "response")
+# Changing probabilities
+predict_reg10 <- ifelse(y_pred >0.5, 1, 0)
+   
+# Evaluating model accuracy
+# using confusion matrix
+table(test_reg1$status, predict_reg10)
+error <- mean(predict_reg10 != test_reg1$status)
+print(paste('Accuracy',1-error))   
+
+```
+```{r}
+Precision(predict_reg10,test_reg1$status)
+Recall(predict_reg10,test_reg1$status)
+F1_Score(predict_reg10,test_reg1$status)
+```
+
+```{r}
+library(lightgbm) 
+params = list(
+  objective= 'binary'
+)
+```
+
+```{r}
+train_reg5 = as.matrix(train_reg1)
+test_reg5= as.matrix(test_reg1)
+
+train_x = train_reg5[, -23]
+train_y = train_reg5[, 23]
+
+test_x = test_reg5[, -23]
+test_y = test_reg5[, 23]
+
+dtrain = lgb.Dataset(train_x, label = train_y)
+dtest = lgb.Dataset.create.valid(dtrain, data=test_x, label = test_y)
+ 
+```
+
+```{r}
+valids = list(test = dtest)
+```
+
+```{r}
+model = lgb.train(params,
+                   dtrain,
+                   nrounds = 100,
+                   valids,
+                   min_data=1,
+                   learning_rate = 1,
+                   early_stopping_rounds = 10)
+```
+
+```{r}
+pred3 = predict(model, test_x, reshape=T)
+predict_reg16 <- ifelse(pred3 >0.5, 1, 0)
+   
+# Evaluating model accuracy
+# using confusion matrix
+table(test_y, predict_reg16)
+error <- mean(predict_reg16 != test_y)
+print(paste('Accuracy',1-error))  
+
+```
+```{r}
+Precision(predict_reg16,test_reg1$status)
+Recall(predict_reg16,test_reg1$status)
+F1_Score(predict_reg16,test_reg1$status)
+```
+
+
+```{r}
+
+library(neuralnet)
+n <- neuralnet(status~.,
+               data = train_reg1,
+               hidden = 5,
+               err.fct = "ce",
+               linear.output = FALSE,
+               lifesign = 'full',
+               rep = 5,
+               algorithm = "rprop+",
+               stepmax = 100000)
+```
+
+```{r}
+output <- compute(n, rep = 5, test_reg1[, -23])
+p1 <- output$net.result
+pred1 <- ifelse(p1 > 0.5, 1, 0)
+tab1 <- table(pred1, test_reg1$status)
+tab1
+```
+
+```{r}
+accuracy=sum(diag(tab1)) / sum(tab1)
+accuracy
+```
+```{r}
+Precision(pred1,test_reg1$status)
+Recall(pred1,test_reg1$status)
+F1_Score(pred1,test_reg1$status)
+
+```
+
+
+```{r}
+my_pca <- prcomp(df, scale = TRUE,
+                center = TRUE, retx = T)
+names(my_pca)
+ 
+# Summary
+summary(my_pca)
+
+ 
+```
+```{r}
+my_pca$rotation
+ 
+# See the principal components
+dim(my_pca$x)
+
+ 
+```
+
+
+```{r}
+biplot(my_pca, main = "Biplot", scale = 0)
+ 
+```
+
+
+```{r}
+my_pca.var <- my_pca$sdev ^ 2
+my_pca.var
+ 
+```
+
+
+```{r}
+propve <- my_pca.var / sum(my_pca.var)
+
+ 
+# Plot variance explained for each principal component
+plot(propve, xlab = "principal component",
+            ylab = "Proportion of Variance Explained",
+            ylim = c(0, 1), type = "b",
+            main = "Scree Plot")
+```
+
+```{r}
+plot(cumsum(propve),
+    xlab = "Principal Component",
+    ylab = "Cumulative Proportion of Variance Explained",
+    ylim = c(0, 1), type = "b")
+ 
+```
+
+
+```{r}
+which(cumsum(propve) >= 0.9)[1]
+```
+```{r}
+df2 <- data.frame(status=df$status, my_pca$x[, 1:6])
+ 
+```
+
+```{r}
+head(df2,2)
+```
+```{r}
+summary(df2)
+```
+
+```{r}
+set.seed(123)
+split <- sample.split(df2, SplitRatio = 0.7)
+train_reg2 <- subset(df2, split == "TRUE")
+test_reg2 <- subset(df2, split == "FALSE")
+```
+
+```{r}
+logistic_model <- glm(train_reg2$status ~., 
+                      data = train_reg2, 
+                      family = "binomial")
+logistic_model
+```
+```{r}
+y_pred11 <- predict(logistic_model, newdata = test_reg2,type = "response")
+# Changing probabilities
+predict_reg11 <- ifelse(y_pred11 >0.5, 1, 0)
+   
+# Evaluating model accuracy
+# using confusion matrix
+table(test_reg2$status, predict_reg11)
+error <- mean(predict_reg11 != test_reg2$status)
+print(paste('Accuracy',1-error))   
+```
+```{r}
+Precision(predict_reg11,test_reg2$status)
+Recall(predict_reg11,test_reg2$status)
+F1_Score(predict_reg11,test_reg2$status)
+```
+
+```{r}
+library(e1071)
+
+classifier = svm(formula =status ~.,
+				data = train_reg2,
+				type = 'C-classification',
+				kernel = 'linear')
+```
+
+```{r}
+y_pred12 <- predict(classifier, newdata = test_reg2,type = "response")
+# Changing probabilities
+
+   
+# Evaluating model accuracy
+# using confusion matrix
+table(test_reg2$status, y_pred12)
+error <- mean(y_pred12 != test_reg2$status)
+print(paste('Accuracy',1-error)) 
+```
+```{r}
+Precision(y_pred12,test_reg2$status)
+Recall(y_pred12,test_reg2$status)
+F1_Score(y_pred12,test_reg2$status)
+```
+
+```{r}
+library(randomForest)
+
+classifier_RF1 = randomForest(status ~ ., data = train_reg2, ntree = 200)
+
+classifier_RF1
+```
+```{r}
+y_pred13 <- predict(classifier_RF1, newdata = test_reg2,type = "response")
+# Changing probabilities
+predict_reg13 <- ifelse(y_pred13 >0.5, 1, 0)
+   
+# Evaluating model accuracy
+# using confusion matrix
+table(test_reg2$status, predict_reg13)
+error <- mean(predict_reg13 != test_reg2$status)
+print(paste('Accuracy',1-error))   
+```
+```{r}
+Precision(predict_reg13,test_reg2$status)
+Recall(predict_reg13,test_reg2$status)
+F1_Score(predict_reg13,test_reg2$status)
+```
+
+
+```{r}
+library(xgboost)
+xgb1 <- xgboost(data.matrix(train_reg2[,-1]), 
+ label = train_reg2$status, 
+ eta = 0.1,
+ max_depth = 15, 
+ nround=25, 
+ subsample = 0.5,
+ colsample_bytree = 0.5,
+ seed = 1,
+
+)
+```
+```{r}
+ y_pred14 <- predict(xgb1, newdata = data.matrix(test_reg2[,-1]),type = "response")
+# Changing probabilities
+predict_reg14 <- ifelse(y_pred14 >0.5, 1, 0)
+   
+# Evaluating model accuracy
+# using confusion matrix
+table(test_reg2$status, predict_reg14)
+error <- mean(predict_reg14 != test_reg2$status)
+print(paste('Accuracy',1-error))  
+```
+```{r}
+Precision(predict_reg14,test_reg2$status)
+Recall(predict_reg14,test_reg2$status)
+F1_Score(predict_reg14,test_reg2$status)
+```
+
+```{r}
+library(lightgbm) 
+params = list(
+  objective= 'binary'
+)
+
+```
+```{r}
+train_reg3 = as.matrix(train_reg2)
+test_reg3 = as.matrix(test_reg2)
+
+train_x = train_reg3[, -1]
+train_y = train_reg3[, 1]
+
+test_x = test_reg3[, -1]
+test_y = test_reg3[, 1]
+
+dtrain = lgb.Dataset(train_x, label = train_y)
+dtest = lgb.Dataset.create.valid(dtrain, data=test_x, label = test_y)
+ 
+```
+
+```{r}
+valids = list(test = dtest)
+```
+```{r}
+model = lgb.train(params,
+                   dtrain,
+                   nrounds = 100,
+                   valids,
+                   min_data=1,
+                   learning_rate = 1,
+                   early_stopping_rounds = 10)
+```
+
+
+```{r}
+pred = predict(model, test_x, reshape=T)
+predict_reg15 <- ifelse(pred >0.5, 1, 0)
+   
+# Evaluating model accuracy
+# using confusion matrix
+table(test_reg2$status, predict_reg15)
+error <- mean(predict_reg15 != test_reg2$status)
+print(paste('Accuracy',1-error))  
+```
+```{r}
+Precision(predict_reg15,test_reg2$status)
+Recall(predict_reg15,test_reg2$status)
+F1_Score(predict_reg15,test_reg2$status)
+
+```
+```{r}
+
+library(neuralnet)
+n <- neuralnet(status~.,
+               data = train_reg2,
+               hidden = 5,
+               err.fct = "ce",
+               linear.output = FALSE,
+               lifesign = 'full',
+               rep = 50,
+               algorithm = "rprop+",
+               stepmax = 1000)
+
+```
+```{r}
+y_pred18 <- predict(n, newdata = test_reg2,type = "response")
+# Changing probabilities
+predict_reg18 <- ifelse(y_pred18 >0.5, 1, 0)
+   
+# Evaluating model accuracy
+# using confusion matrix
+table(test_reg2$status, predict_reg18)
+error <- mean(predict_reg18 != test_reg2$status)
+print(paste('Accuracy',1-error))   
+```
+
+```{r}
+Precision(predict_reg18,test_reg2$status)
+Recall(predict_reg18,test_reg2$status)
+F1_Score(predict_reg18,test_reg2$status)
+
+```
+
+
+
+
