@@ -38,3 +38,7 @@ install.packages("moments")
 
 The Highest accuracy is recievced by ANN after Principal component analysis WHICH IS 97.6%,
 
+## Results
+
+![image](https://user-images.githubusercontent.com/84379934/232119764-cf36aae2-c479-4cf2-b50c-4f73925395c6.png)
+
