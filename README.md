@@ -36,7 +36,7 @@ install.packages("moments")
 
 ## Performance Metrics
 
-The Highest accuracy is recievced by ANN after Principal component analysis WHICH IS 97.6%,
+The Highest accuracy is recievced by ANN after Principal component analysis WHICH IS 97.6%.
 
 ## Results
 
